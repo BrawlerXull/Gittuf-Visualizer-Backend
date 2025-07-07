@@ -27,7 +27,7 @@ Handles cloning Git repositories, fetching custom Gittuf refs, and decoding secu
 ```bash
 # Clone the backend repo
 git clone https://github.com/BrawlerXull/Gittuf-Visualizer-Backend.git
-cd brawlerxull-gittuf-visualizer-backend
+cd gittuf-visualizer-backend
 
 # Create and activate a virtual environment (optional but recommended)
 python -m venv venv
