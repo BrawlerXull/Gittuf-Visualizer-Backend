@@ -5,6 +5,7 @@ import tempfile
 import subprocess
 from flask import Flask, request, jsonify
 from git import Repo, GitCommandError, Git
+import datetime
 
 from flask_cors import CORS
 
@@ -111,6 +112,70 @@ def metadata():
     except Exception as e:
         print(f"[ERROR] Exception in /metadata: {e}")
         return jsonify({"error": str(e)}), 500
+  
+def get_absolute_path(path: str) -> str:
+    return os.path.abspath(path)
 
-if __name__ == '__main__':
+def is_valid_git_repo(path: str) -> bool:
+    return os.path.exists(os.path.join(path, ".git"))
+
+@app.route("/commits-local", methods=["POST"])
+def commits_local():
+    data = request.get_json()
+    path = data.get("path")
+    print(path)
+
+    if not path:
+        return jsonify({"error": "Missing 'path' in request body"}), 400
+
+    path = get_absolute_path(path)
+    print(path)
+
+    if not os.path.exists(path):
+        return jsonify({"error": f"Path does not exist: {path}"}), 400
+
+    if not is_valid_git_repo(path):
+        return jsonify({"error": f"Not a valid Git repository: {path}"}), 400
+
+    try:
+        repo = Repo(path)
+        commits = [
+            {
+                "hash": commit.hexsha,
+                "message": commit.message.strip(),
+                "author": commit.author.name,
+                "date": datetime.datetime.fromtimestamp(commit.committed_date).isoformat(),
+            }
+            for commit in repo.iter_commits("HEAD")
+        ]
+        return jsonify(commits)
+    except Exception as e:
+        return jsonify({"error": f"Failed to load commits: {str(e)}"}), 500
+
+
+@app.route("/metadata-local", methods=["POST"])
+def metadata_local():
+    data = request.get_json()
+    path = data.get("path")
+    commit = data.get("commit")
+    file = data.get("file")
+
+    if not all([path, commit, file]):
+        return jsonify({"error": "Missing 'path', 'commit', or 'file'"}), 400
+
+    path = get_absolute_path(path)
+
+    if not os.path.exists(path):
+        return jsonify({"error": f"Path does not exist: {path}"}), 400
+
+    if not is_valid_git_repo(path):
+        return jsonify({"error": f"Not a valid Git repository: {path}"}), 400
+
+    try:
+        return jsonify(decode_metadata_blob(path, commit, file))
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch metadata: {str(e)}"}), 500
+
+
+if __name__ == "__main__":
     app.run(debug=True)
